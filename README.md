@@ -19,18 +19,15 @@ Google Gemini AIのFile Search APIを使用したPDFチャットアプリケー�
 ### 依存パッケージのインストール
 
 ```bash
-uv pip install -r src/requirements.txt
+uv pip install -r requirements.txt
 ```
 
-### 環境変数の設定
+### APIキーの準備
 
-`src/.env` ファイルを作成：
+このアプリケーションは**ユーザーが自分のAPIキーを入力する方式**です。
 
-```bash
-GEMINI_API_KEY=your_api_key_here
-```
-
-APIキーは [Google AI Studio](https://makersuite.google.com/app/apikey) から取得。
+1. [Google AI Studio](https://makersuite.google.com/app/apikey) でAPIキーを取得
+2. アプリ起動後、サイドバーにAPIキーを入力
 
 ### アプリケーションの起動
 
@@ -39,6 +36,29 @@ uv run streamlit run src/app.py
 ```
 
 デフォルトで `http://localhost:8501` で起動。
+
+## セキュリティに関する注意
+
+### APIキーの取り扱い
+
+このアプリケーションは、各ユーザーが自分のGemini APIキーを入力して使用する設計です。
+
+**セキュリティ上の利点:**
+- アプリ提供者がAPIコストを負担しない
+- 各ユーザーが自分のAPIキー使用量を管理
+- APIキーはブラウザセッション内のみで保持（リロードで消去）
+- Streamlitはサーバーサイド実行のため、ブラウザのDevToolsからキーは見えない
+
+**注意事項:**
+- ⚠️ APIキーを他人と共有しないでください
+- ⚠️ 公開されたStreamlit Cloudアプリを使用する場合、信頼できる提供者のみを利用してください
+- ⚠️ セッションログにAPIキーが記録される可能性があります
+- ⚠️ 本番環境での使用は自己責任で行ってください
+
+**推奨される使い方:**
+- ローカル環境での実行が最も安全
+- 公開する場合は、利用者に注意事項を明示
+- 重要なプロジェクトでは、バックエンドサーバーでAPIキーを管理する実装を検討
 
 ## アーキテクチャ
 

@@ -10,18 +10,6 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 
-# Load environment variables
-try:
-    # Streamlit Cloud - use secrets
-    api_key = st.secrets["GEMINI_API_KEY"]
-except:
-    # Local development - use .env file
-    load_dotenv()
-    api_key = os.getenv("GEMINI_API_KEY")
-
-# Initialize Gemini client
-client = genai.Client(api_key=api_key)
-
 # Language translations
 TRANSLATIONS = {
     'en': {
@@ -31,6 +19,11 @@ TRANSLATIONS = {
         'subtitle': "Upload a PDF and ask questions about its content using Google's Gemini AI",
         'language': 'Language',
         'model': 'Model',
+        'api_key_label': 'Enter your Gemini API Key',
+        'api_key_help': 'Get your API key from https://makersuite.google.com/app/apikey',
+        'api_key_warning': '⚠️ Security Notice',
+        'api_key_warning_text': 'Your API key is stored only in your browser session and is not saved. However, never share your API key with others.',
+        'api_key_required': '👈 Please enter your Gemini API key to start',
         'sidebar_header': 'PDF Upload',
         'choose_file': 'Choose a PDF file',
         'processing': 'Processing PDF...',
@@ -60,6 +53,11 @@ TRANSLATIONS = {
         'subtitle': 'PDFをアップロードして、Google Gemini AIを使って内容について質問できます',
         'language': '言語',
         'model': 'モデル',
+        'api_key_label': 'Gemini APIキーを入力',
+        'api_key_help': 'APIキーは https://makersuite.google.com/app/apikey から取得できます',
+        'api_key_warning': '⚠️ セキュリティに関する注意',
+        'api_key_warning_text': 'APIキーはブラウザのセッション内のみに保存され、保存されません。ただし、APIキーを他人と共有しないでください。',
+        'api_key_required': '👈 開始するにはGemini APIキーを入力してください',
         'sidebar_header': 'PDFアップロード',
         'choose_file': 'PDFファイルを選択',
         'processing': 'PDFを処理中...',
@@ -125,7 +123,7 @@ def save_uploaded_file(uploaded_file, lang='en'):
         st.error(get_text('error_save_file', lang).format(e))
         return None
 
-def create_file_search_store(store_name, lang='en'):
+def create_file_search_store(client, store_name, lang='en'):
     """Create a new File Search Store"""
     try:
         store = client.file_search_stores.create(
@@ -136,7 +134,7 @@ def create_file_search_store(store_name, lang='en'):
         st.error(get_text('error_create_store', lang).format(e))
         return None
 
-def upload_file_to_store(file_path, store_name, display_name, lang='en'):
+def upload_file_to_store(client, file_path, store_name, display_name, lang='en'):
     """Upload file to File Search Store"""
     try:
         upload_op = client.file_search_stores.upload_to_file_search_store(
@@ -156,7 +154,7 @@ def upload_file_to_store(file_path, store_name, display_name, lang='en'):
         st.error(get_text('error_upload_store', lang).format(e))
         return None
 
-def query_file_search(question, store_name, model, lang='en'):
+def query_file_search(client, question, store_name, model, lang='en'):
     """Query the File Search Store with a question"""
     try:
         response = client.models.generate_content(
@@ -177,7 +175,7 @@ def query_file_search(question, store_name, model, lang='en'):
         st.error(get_text('error_query', lang).format(e))
         return None
 
-def cleanup_store(store_name, lang='en'):
+def cleanup_store(client, store_name, lang='en'):
     """Delete the File Search Store"""
     try:
         client.file_search_stores.delete(
@@ -213,11 +211,6 @@ if 'model' not in st.session_state:
 # Get current language
 lang = st.session_state.language
 
-# Check API key
-if not api_key:
-    st.error(get_text('error_api_key', lang))
-    st.stop()
-
 st.title(get_text('main_title', lang))
 st.markdown(get_text('subtitle', lang))
 
@@ -238,6 +231,32 @@ with st.sidebar:
         st.rerun()
 
     lang = st.session_state.language
+
+    st.markdown("---")
+
+    # API Key input
+    st.subheader("🔑 API Key")
+    api_key_input = st.text_input(
+        get_text('api_key_label', lang),
+        type="password",
+        help=get_text('api_key_help', lang)
+    )
+
+    # Security warning
+    with st.expander(get_text('api_key_warning', lang)):
+        st.caption(get_text('api_key_warning_text', lang))
+
+    # Check API key
+    if not api_key_input:
+        st.warning(get_text('api_key_required', lang))
+        st.stop()
+
+    # Initialize Gemini client with user's API key
+    try:
+        client = genai.Client(api_key=api_key_input)
+    except Exception as e:
+        st.error(f"API Key Error: {e}")
+        st.stop()
 
     # Model selector
     model_options = [
@@ -267,12 +286,13 @@ with st.sidebar:
                 store_display_name = f'pdf-chat-store-{unique_id}'
 
                 # Create file search store
-                store = create_file_search_store(store_display_name, lang)
+                store = create_file_search_store(client, store_display_name, lang)
 
                 if store:
                     # Upload file to store
                     file_display_name = Path(uploaded_file.name).stem
                     uploaded = upload_file_to_store(
+                        client,
                         temp_file_path,
                         store.name,
                         file_display_name,
@@ -297,7 +317,7 @@ with st.sidebar:
         if st.button(get_text('clear_button', lang)):
             # Cleanup store
             if st.session_state.store_name:
-                cleanup_store(st.session_state.store_name, lang)
+                cleanup_store(client, st.session_state.store_name, lang)
 
             # Reset session state
             st.session_state.store_name = None
@@ -331,7 +351,7 @@ else:
         # Generate response
         with st.chat_message("assistant"):
             with st.spinner(get_text('thinking', lang)):
-                response = query_file_search(prompt, st.session_state.store_name, st.session_state.model, lang)
+                response = query_file_search(client, prompt, st.session_state.store_name, st.session_state.model, lang)
 
                 if response and response.text:
                     st.markdown(response.text)
