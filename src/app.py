@@ -11,9 +11,13 @@ from google.genai import types
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv()
-
-api_key = os.getenv("GEMINI_API_KEY")
+try:
+    # Streamlit Cloud - use secrets
+    api_key = st.secrets["GEMINI_API_KEY"]
+except:
+    # Local development - use .env file
+    load_dotenv()
+    api_key = os.getenv("GEMINI_API_KEY")
 
 # Initialize Gemini client
 client = genai.Client(api_key=api_key)
